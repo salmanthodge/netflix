@@ -150,7 +150,7 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const getUser = async (req, res) => {
+const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
     console.log(req.params);
@@ -300,9 +300,9 @@ router.post("/login", loginUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
-router.get("/users", getAllUser);
-router.get("/users/:id", getUser);
 router.put("/users/:id", updateUser);
+router.get("/users", getAllUser);
+router.get("/users/:id", getUserById);
 router.delete("/users/:id", deleteUser);
 // ==============================================================================================
 
@@ -310,7 +310,8 @@ router.delete("/users/:id", deleteUser);
 //get all profiles
 const getAllProfiles = async (req, res) => {
   try {
-    const { user_id, limit, offset, sort } = req.query;
+    const { user_id } = req.headers;
+    const { limit, offset, sort } = req.query;
 
     // console.log(req.headers);
     if (!req.query) {
@@ -347,13 +348,14 @@ const getAllProfiles = async (req, res) => {
 };
 
 //GET SINGLE PROFILES
-const getProfiles = async (req, res) => {
+const getProfilesbyid = async (req, res) => {
   try {
     const { id } = req.params;
+    const { user_id } = req.headers;
 
     // console.log(req);
-    let queryString = `SELECT * from profiles where id = ?`;
-    const [result] = await conn.promise().execute(queryString, [id]);
+    let queryString = `SELECT * from profiles where user_id = ? and id =?`;
+    const [result] = await conn.promise().execute(queryString, [user_id, id]);
     if (result.length === 0) {
       res.status(404).send({
         message: "profile not found",
@@ -376,13 +378,14 @@ const getProfiles = async (req, res) => {
 //CREATE PROFILES
 const createProfiles = async (req, res) => {
   try {
-    const { name, limits, type, user_id } = req.body;
+    const { user_id } = req.headers;
+    const { name, limits, type } = req.body;
 
-    let queryString = `INSERT INTO profiles (name, limits, type, user_id)
-      VALUES (?, ?, ?, ?)`;
+    let queryString = `INSERT INTO profiles (name, limits, type)
+      VALUES (?, ?, ?)`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [name, limits, type, user_id]);
+      .execute(queryString, [name, limits, type]);
 
     res.status(201).send({
       message: "Profile created successfully",
@@ -401,7 +404,8 @@ const createProfiles = async (req, res) => {
 const updateProfiles = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, limits, type, user_id } = req.body;
+    const { user_id } = req.headers;
+    const { name, limits, type } = req.body;
     let queryString = `UPDATE profiles SET name = ?,limits =?, type=?, user_id=? WHERE id = ?`;
     const [result] = await conn
       .promise()
@@ -453,7 +457,7 @@ const deleteProfiles = async (req, res) => {
 // ROUTES
 // profiles routes
 router.get("/profiles", getAllProfiles);
-router.get("/profiles/:id", getProfiles);
+router.get("/profiles/:id", getProfilesbyid);
 router.post("/profiles", createProfiles);
 router.put("/profiles/:id", updateProfiles);
 router.delete("/profiles/:id", deleteProfiles);
@@ -461,26 +465,13 @@ router.delete("/profiles/:id", deleteProfiles);
 
 //Get all videos=>content
 const getAllContents = async (req, res) => {
-  const { limit, offset, sort } = req.query;
-  // console.log(req.headers);
-  const queryData = req.query;
-  let is_active = queryData.is_active;
-  if (!is_active) {
-    res.status(400).send({
-      message: "This content is not available",
-    });
-  }
-
   try {
-    let queryString = `SELECT id,title,description,type,release_date from contents WHERE is_active = ? order by id ${sort} LIMIT ? OFFSET ? `;
-    const [result] = await conn
-      .promise()
-      .execute(queryString, [is_active, limit, offset]);
+    const { limit, offset, sort } = req.query;
+    let queryString = `SELECT id,title,description,type,release_date from contents  order by id ${sort} LIMIT ? OFFSET ? `;
+    const [result] = await conn.promise().execute(queryString, [limit, offset]);
 
-    let countQueryString = `SELECT count(id) as count from contents WHERE is_active = ?`;
-    const [countResult] = await conn
-      .promise()
-      .execute(countQueryString, [is_active]);
+    let countQueryString = `SELECT count(id) as count from contents `;
+    const [countResult] = await conn.promise().execute(countQueryString);
 
     const responseBody = {
       message: "Successfully got all videos",
@@ -499,7 +490,7 @@ const getAllContents = async (req, res) => {
 };
 
 //GET SINGLE VIDEO
-const getContent = async (req, res) => {
+const getContentbyid = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -528,19 +519,13 @@ const getContent = async (req, res) => {
 //CREATE VIDEO
 const createContent = async (req, res) => {
   try {
-    const { title, description, type, release_date, is_active } = req.body;
+    const { title, description, type, release_date } = req.body;
 
     let queryString = `INSERT INTO contents (title, description, type, release_date)
       VALUES (?, ?, ?, ?)`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [
-        title,
-        description,
-        type,
-        release_date,
-        is_active,
-      ]);
+      .execute(queryString, [title, description, type, release_date]);
 
     res.status(201).send({
       message: "Video created successfully",
@@ -559,18 +544,11 @@ const createContent = async (req, res) => {
 const updateContent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, type, release_date, is_active } = req.body;
-    let queryString = `UPDATE contents SET title = ?,description =?, type=?, release_date=?, is_active =? WHERE id = ?`;
+    const { title, description, type, release_date } = req.body;
+    let queryString = `UPDATE contents SET title = ?,description =?, type=?, release_date=? WHERE id = ?`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [
-        title,
-        description,
-        type,
-        release_date,
-        is_active,
-        id,
-      ]);
+      .execute(queryString, [title, description, type, release_date, id]);
     if (result.affectedRows === 0) {
       res.status(404).send({
         message: "Video not found",
@@ -617,7 +595,7 @@ const deleteContent = async (req, res) => {
 
 //Routes
 router.get("/videos", getAllContents);
-router.get("/videos/:id", getContent);
+router.get("/videos/:id", getContentbyid);
 router.post("/videos", createContent);
 router.put("/videos/:id", updateContent);
 router.delete("/videos/:id", deleteContent);
@@ -625,26 +603,13 @@ router.delete("/videos/:id", deleteContent);
 
 //GET ALL GENRE
 const getAllGenre = async (req, res) => {
-  const { limit, offset, sort } = req.query;
-  // console.log(req.headers);
-  const queryData = req.query;
-  let is_active = queryData.is_active;
-  if (!is_active) {
-    res.status(400).send({
-      message: "This content is not available",
-    });
-  }
-
   try {
-    let queryString = `SELECT name,description from genres WHERE is_active =?  order by id ${sort} LIMIT ? OFFSET ? `;
-    const [result] = await conn
-      .promise()
-      .execute(queryString, [is_active, limit, offset]);
+    const { limit, offset, sort } = req.query;
+    let queryString = `SELECT name,description from genres  order by id ${sort} LIMIT ? OFFSET ? `;
+    const [result] = await conn.promise().execute(queryString, [limit, offset]);
 
-    let countQueryString = `SELECT count(id) as count from genres WHERE is_active = ?`;
-    const [countResult] = await conn
-      .promise()
-      .execute(countQueryString, [is_active]);
+    let countQueryString = `SELECT count(id) as count from genres`;
+    const [countResult] = await conn.promise().execute(countQueryString);
 
     const responseBody = {
       message: "Successfully got all Genres",
@@ -663,11 +628,9 @@ const getAllGenre = async (req, res) => {
 };
 
 //GET SINGLE GENRE
-const getGenre = async (req, res) => {
+const getGenrebyid = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // console.log(req);
     let queryString = `SELECT * from genres where id = ?`;
     const [result] = await conn.promise().execute(queryString, [id]);
     if (result.length === 0) {
@@ -692,13 +655,13 @@ const getGenre = async (req, res) => {
 //CREATE GENRE
 const createGenre = async (req, res) => {
   try {
-    const { name, description, is_active } = req.body;
+    const { name, description } = req.body;
 
-    let queryString = `INSERT INTO genres (name, description,is_active)
-      VALUES (?, ?, ?)`;
+    let queryString = `INSERT INTO genres (name, description)
+      VALUES (?, ?)`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [name, description, is_active]);
+      .execute(queryString, [name, description]);
 
     res.status(201).send({
       message: "Genre created successfully",
@@ -717,11 +680,11 @@ const createGenre = async (req, res) => {
 const updateGenre = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, is_active } = req.body;
-    let queryString = `UPDATE genres SET name = ?,description =?, is_active =? WHERE id = ?`;
+    const { name, description } = req.body;
+    let queryString = `UPDATE genres SET name = ?,description =? WHERE id = ?`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [name, description, is_active, id]);
+      .execute(queryString, [name, description, id]);
     if (result.affectedRows === 0) {
       res.status(404).send({
         message: "Genre not found",
@@ -768,7 +731,7 @@ const deleteGenre = async (req, res) => {
 
 //routes
 router.get("/genres", getAllGenre);
-router.get("/genres/:id", getGenre);
+router.get("/genres/:id", getGenrebyid);
 router.post("/genres", createGenre);
 router.put("/genres/:id", updateGenre);
 router.delete("/genres/:id", deleteGenre);
@@ -790,26 +753,13 @@ router.delete("/genres/:id", deleteGenre);
 
 //GET ALL ACTORS
 const getAllActors = async (req, res) => {
-  const { limit, offset, sort } = req.query;
-  // console.log(req.headers);
-  const queryData = req.query;
-  let is_active = queryData.is_active;
-  if (!is_active) {
-    res.status(400).send({
-      message: "This Actor is not available",
-    });
-  }
-
   try {
-    let queryString = `SELECT name,created_at from actors WHERE is_active =?  order by id ${sort} LIMIT ? OFFSET ? `;
-    const [result] = await conn
-      .promise()
-      .execute(queryString, [is_active, limit, offset]);
+    const { limit, offset, sort } = req.query;
+    let queryString = `SELECT name,created_at from actors  order by id ${sort} LIMIT ? OFFSET ? `;
+    const [result] = await conn.promise().execute(queryString, [limit, offset]);
 
-    let countQueryString = `SELECT count(id) as count from actors WHERE is_active = ?`;
-    const [countResult] = await conn
-      .promise()
-      .execute(countQueryString, [is_active]);
+    let countQueryString = `SELECT count(id) as count from actors `;
+    const [countResult] = await conn.promise().execute(countQueryString);
 
     const responseBody = {
       message: "Successfully got all Actors",
@@ -828,12 +778,12 @@ const getAllActors = async (req, res) => {
 };
 
 //GET SINGLE ACTORS
-const getActors = async (req, res) => {
+const getActorbyid = async (req, res) => {
   try {
     const { id } = req.params;
 
     // console.log(req);
-    let queryString = `SELECT * from actors where id = ?`;
+    let queryString = `SELECT name,is_active from actors where id = ?`;
     const [result] = await conn.promise().execute(queryString, [id]);
     if (result.length === 0) {
       res.status(404).send({
@@ -933,26 +883,17 @@ const deleteActors = async (req, res) => {
 
 //routes
 router.get("/actors", getAllActors);
-router.get("/actors/:id", getActors);
+router.get("/actors/:id", getActorbyid);
 router.post("/actors", createActors);
 router.put("/actors/:id", updateActors);
 router.delete("/actors/:id", deleteActors);
 // ==========================================================================================
-// pending => casts insert,contents_genres , casts-actors , watch_history
 
 //GET ALL CASTS
 const getAllCasts = async (req, res) => {
-  const { limit, offset, sort } = req.query;
-  // console.log(req.headers);
-  const queryData = req.query;
-  let actor_id = queryData.actor_id;
-  if (!actor_id) {
-    res.status(400).send({
-      message: "This Actor is not available",
-    });
-  }
-
   try {
+    const { actor_id } = req.headers;
+    const { limit, offset, sort } = req.query;
     let queryString = `SELECT casts.id, actors.name, contents.title, casts.created_at, casts.updated_at
       FROM casts
       JOIN actors ON casts.actor_id = actors.id
@@ -983,16 +924,16 @@ const getAllCasts = async (req, res) => {
 };
 
 //GET SINGLE CASTS
-const getCasts = async (req, res) => {
+const getCastbyid = async (req, res) => {
   try {
+    const { actor_id } = req.headers;
     const { id } = req.params;
-
     // console.log(req);
     let queryString = `SELECT casts.id , actors.name, contents.title, casts.created_at, casts.updated_at
       FROM casts
       JOIN actors ON casts.actor_id = actors.id
-      JOIN contents ON casts.content_id = contents.id where casts.id = ?`;
-    const [result] = await conn.promise().execute(queryString, [casts.id]);
+      JOIN contents ON casts.content_id = contents.id where casts.id = ? and casts.actor_id = ?`;
+    const [result] = await conn.promise().execute(queryString, [id, actor_id]);
     if (result.length === 0) {
       res.status(404).send({
         message: "Casts not found",
@@ -1015,22 +956,22 @@ const getCasts = async (req, res) => {
 //CREATE CASTS
 const createCasts = async (req, res) => {
   try {
-    const { name, is_active } = req.body;
+    const { actor_id, content_id } = req.body;
 
-    let queryString = `INSERT INTO actors (name,is_active)
+    let queryString = `INSERT INTO casts (actor_id,content_id)
       VALUES (?, ?)`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [name, is_active]);
+      .execute(queryString, [actor_id, content_id]);
 
     res.status(201).send({
-      message: "Actor created successfully",
+      message: "Cast created successfully",
       result,
     });
   } catch (error) {
     console.log(error);
     res.status(500).send({
-      message: "Error while creating Actor",
+      message: "Error while creating Cast",
       error,
     });
   }
@@ -1040,25 +981,25 @@ const createCasts = async (req, res) => {
 const updateCasts = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, is_active } = req.body;
-    let queryString = `UPDATE actors SET name = ?,is_active =? WHERE id = ?`;
+    const { actor_id, content_id } = req.body;
+    let queryString = `UPDATE casts SET actor_id = ?,content_id =? WHERE id = ?`;
     const [result] = await conn
       .promise()
-      .execute(queryString, [name, is_active, id]);
+      .execute(queryString, [actor_id, content_id, id]);
     if (result.affectedRows === 0) {
       res.status(404).send({
-        message: "Actor not found",
+        message: "cast not found",
       });
     } else {
       res.status(200).send({
-        message: "Actor updated Succesfully",
+        message: "cast updated Succesfully",
         result,
       });
     }
   } catch (error) {
     console.log(error);
     res.status(500).send({
-      message: "Error while updating actor",
+      message: "Error while updating cast",
       error,
     });
   }
@@ -1068,22 +1009,22 @@ const updateCasts = async (req, res) => {
 const deleteCasts = async (req, res) => {
   try {
     const { id } = req.params;
-    let queryString = `DELETE from actors WHERE id = ?`;
+    let queryString = `DELETE from casts WHERE id = ?`;
     const [result] = await conn.promise().execute(queryString, [id]);
     if (result.affectedRows === 0) {
       res.status(404).send({
-        message: "Actor not found",
+        message: "cast not found",
       });
     } else {
       res.status(200).send({
-        message: "Actor deleted successfully",
+        message: "cast deleted successfully",
         result,
       });
     }
   } catch (error) {
     console.log(error);
     res.status(500).send({
-      message: "Error while deleting actor",
+      message: "Error while deleting cast",
       error,
     });
   }
@@ -1091,9 +1032,289 @@ const deleteCasts = async (req, res) => {
 
 // //routes
 router.get("/casts", getAllCasts);
-router.get("/casts/:id", getCasts);
+router.get("/casts/:id", getCastbyid);
 router.post("/casts", createCasts);
 router.put("/casts/:id", updateCasts);
 router.delete("/casts/:id", deleteCasts);
+// ===================================================================================
+// GET ALL HISTORY
+const getAllhistory = async (req, res) => {
+  try {
+    const { limit, offset, sort } = req.query;
+    let queryString = `select * from watch_historys 
+    inner join users on users.id = watch_historys.user_id
+    inner join contents on contents.id = watch_historys.content_id order by watch_duration ${sort} LIMIT ? OFFSET ? `;
+    const [result] = await conn.promise().execute(queryString, [limit, offset]);
+    let countQueryString = `SELECT count(id) as count from watch_historys `;
+    const [countResult] = await conn.promise().execute(countQueryString);
+
+    const responseBody = {
+      message: "Successfully got all history",
+      list: result,
+      count: countResult[0].count,
+    };
+    res.status(200).send(responseBody);
+    // console.log(result);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Error while getting history",
+      error,
+    });
+  }
+};
+
+// get history by id
+const gethistorybyid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // console.log(req);
+    let queryString = `select * from watch_historys 
+    inner join users on users.id = watch_historys.user_id
+    inner join contents on contents.id = watch_historys.content_id where watch_historys.id = ?`;
+    const [result] = await conn.promise().execute(queryString, [id]);
+    if (result.length === 0) {
+      res.status(404).send({
+        message: "history not found",
+      });
+    } else {
+      res.status(200).send({
+        message: "Successfully got history",
+        result,
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Error while getting history",
+      error,
+    });
+  }
+};
+
+// post history
+const createhistory = async (req, res) => {
+  try {
+    const { user_id, content_id } = req.body;
+
+    let queryString = `INSERT INTO watch_historys (user_id,content_id)
+      VALUES (?, ?)`;
+    const [result] = await conn
+      .promise()
+      .execute(queryString, [user_id, content_id]);
+
+    res.status(201).send({
+      message: "history created successfully",
+      result,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Error while creating history",
+      error,
+    });
+  }
+};
+
+//UPDATE history
+const updatehistoy = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_id, content_id } = req.body;
+    let queryString = `UPDATE watch_historys SET user_id = ?,content_id =? WHERE id = ?`;
+    const [result] = await conn
+      .promise()
+      .execute(queryString, [user_id, content_id, id]);
+    if (result.affectedRows === 0) {
+      res.status(404).send({
+        message: "history not found",
+      });
+    } else {
+      res.status(200).send({
+        message: "history updated Succesfully",
+        result,
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Error while updating history",
+      error,
+    });
+  }
+};
+
+// //DELETE CASTS
+const deletehistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let queryString = `DELETE from watch_historys WHERE id = ?`;
+    const [result] = await conn.promise().execute(queryString, [id]);
+    if (result.affectedRows === 0) {
+      res.status(404).send({
+        message: "history not found",
+      });
+    } else {
+      res.status(200).send({
+        message: "history deleted successfully",
+        result,
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Error while deleting history",
+      error,
+    });
+  }
+};
+
+// ======================================================================================
+// //GET ALL CG
+// const getAllContentGenre = async (req, res) => {
+//   try {
+//     const { limit, offset, sort } = req.query;
+//     let queryString = `select content_id , genre_id from content_genres
+//     inner join contents on contents.id = content_genres.content_id
+//     inner join genres on genres.id = content_genres.genre_id order by content_genres.id ${sort} LIMIT ? OFFSET ? `;
+//     const [result] = await conn.promise().execute(queryString, [limit, offset]);
+//     let countQueryString = `SELECT count(id) as count from content_genres `;
+//     const [countResult] = await conn.promise().execute(countQueryString);
+
+//     const responseBody = {
+//       message: "Successfully got all Casts",
+//       list: result,
+//       count: countResult[0].count,
+//     };
+//     res.status(200).send(responseBody);
+//     // console.log(result);
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       message: "Error while getting Casts",
+//       error,
+//     });
+//   }
+// };
+
+// //GET SINGLE CG
+// const getcontentGenrebyid = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     // console.log(req);
+//     let queryString = `select content_id , genre_id from content_genres
+//     inner join contents on contents.id = content_genres.content_id
+//     inner join genres on genres.id = content_genres.genre_id where content_id =?  `;
+//     const [result] = await conn.promise().execute(queryString, [id]);
+//     if (result.length === 0) {
+//       res.status(404).send({
+//         message: "content genre not found",
+//       });
+//     } else {
+//       res.status(200).send({
+//         message: "Successfully got content genre",
+//         result,
+//       });
+//     }
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       message: "Error while getting content genre",
+//       error,
+//     });
+//   }
+// };
+
+// //CREATE CG
+// const createcontentgenre = async (req, res) => {
+//   try {
+//     const { actor_id, content_id } = req.body;
+
+//     let queryString = `INSERT INTO casts (actor_id,content_id)
+//       VALUES (?, ?)`;
+//     const [result] = await conn
+//       .promise()
+//       .execute(queryString, [actor_id, content_id]);
+
+//     res.status(201).send({
+//       message: "Cast created successfully",
+//       result,
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       message: "Error while creating Cast",
+//       error,
+//     });
+//   }
+// };
+
+// //UPDATE CG
+// const updatecontentgenre = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { actor_id, content_id } = req.body;
+//     let queryString = `UPDATE casts SET actor_id = ?,content_id =? WHERE id = ?`;
+//     const [result] = await conn
+//       .promise()
+//       .execute(queryString, [actor_id, content_id, id]);
+//     if (result.affectedRows === 0) {
+//       res.status(404).send({
+//         message: "cast not found",
+//       });
+//     } else {
+//       res.status(200).send({
+//         message: "cast updated Succesfully",
+//         result,
+//       });
+//     }
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       message: "Error while updating cast",
+//       error,
+//     });
+//   }
+// };
+
+// // //DELETE CG
+// const deletecontentgenre = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     let queryString = `DELETE from casts WHERE id = ?`;
+//     const [result] = await conn.promise().execute(queryString, [id]);
+//     if (result.affectedRows === 0) {
+//       res.status(404).send({
+//         message: "cast not found",
+//       });
+//     } else {
+//       res.status(200).send({
+//         message: "cast deleted successfully",
+//         result,
+//       });
+//     }
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       message: "Error while deleting cast",
+//       error,
+//     });
+//   }
+// };
+
+// // //routes
+// router.get("/content-genre", getAllContentGenre);
+// router.get("/content-genre/:id", getcontentGenrebyid);
+// router.post("/content-genre", createcontentgenre);
+// router.put("/content-genre/:id", updatecontentgenre);
+// router.delete("/content-genre/:id", deletecontentgenre);
+
+//routes
+
+router.get("/history", getAllhistory);
+router.get("/history/:id", gethistorybyid);
+router.post("/history", createhistory);
+router.put("/history/:id", updatehistoy);
+router.delete("/history/:id", deletehistory);
 
 module.exports = router;
